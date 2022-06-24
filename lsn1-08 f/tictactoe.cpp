@@ -1,26 +1,42 @@
 #include <iostream>
 #include <random> 
 #include <stdlib.h> 
-#include <chrono> 
+#include <chrono>
+#include <fstream>
 
 using namespace std;
 
+//=====================================
+
+#define SCORES "scores" // имя файля со счетом
+
 //цвета консоли делаю через дефайн не дал сделать enum string (
-#define CRESET "\e[0m" //сброс 
-#define CEMPTY "\e[0;32m" //зелень - пустые клетки
-#define CZERO "\e[1;33m" //желтый жирный
-#define CCROSS "\e[1;34m" //синий жирный
-#define CTABLE "\e[0;30m" //номера ячеек
-#define CTABLEU "\e[4;30m" //номера ячеек
+#ifdef __linux__
+    #define CRESET "\e[0m" //сброс 
+    #define CEMPTY "\e[0;32m" //зелень - пустые клетки
+    #define CZERO "\e[1;33m" //желтый жирный
+    #define CCROSS "\e[1;34m" //синий жирный
+    #define CTABLE "\e[0;30m" //номера ячеек
+    #define CTABLEU "\e[4;30m" //номера ячеек underline
+#elif  (_WIN64 || _WIN32)
+    #define CRESET "\e[0m" //сброс 
+    #define CEMPTY "\e[0;32m" //зелень - пустые клетки
+    #define CZERO "\e[1;33m" //желтый жирный
+    #define CCROSS "\e[1;34m" //синий жирный
+    #define CTABLE "\e[0;30m" //номера ячеек
+    #define CTABLEU "\e[4;30m" //номера ячеек underline    
+#endif
 
 void clearScr()  /// очистка экрана
 {
     #ifdef __linux__
          system("clear");
-    #else  (_WIN64 || _WIN32)
+    #elif  (_WIN64 || _WIN32) 
         std::cout << "\y1B[2J\y1B[H";
     #endif
 }
+
+//=====================================
 
 int32_t getRandomNum(int32_t min, int32_t may)
 { 
@@ -40,8 +56,6 @@ enum TCell : char
 
 enum TProgress { HUMAN_WINS, AI_WINS, DRAW, IN_PROGRESS };
 
-//============================
-
 struct TCoord
 {
     size_t y {0U};
@@ -58,9 +72,17 @@ struct TGame
     size_t turn {0U};
 };
 
-int takeSize ()
+//=====================================
+
+size_t takeSize () //запрос размера поля
 {
-    size_t size { 4U };
+    size_t size { 3U };
+    cout << "Введите размер стороны поля (больше 2): ";
+    do 
+    {
+        cin >> size ;
+    } while (size <= 2);
+    clearScr();
     return (size);
 }
 
@@ -103,7 +125,7 @@ void deinitGame (TGame& g)  //освобождаем память
 
 void printGame (TGame& g)   //печатаем поле
 {
-    cout << "  ";
+    cout << "     ";
     for (size_t y = 1; y <= g.size; y++) //первая строка
     {
         cout << CTABLEU << y << " ";
@@ -115,7 +137,7 @@ void printGame (TGame& g)   //печатаем поле
         for (size_t x = 0; x < g.size; x++)
         {
             if (x == 0) 
-                cout << CTABLE << y+1 << "|";            
+                cout << CTABLE << "   " << y+1 << "|";            
             switch (g.ppField[y][x]){  //выбор цвета
             case CROSS:
                 cout << CCROSS;
@@ -134,6 +156,49 @@ void printGame (TGame& g)   //печатаем поле
         }
         cout << endl;
     }    
+    cout << endl;
+}
+
+void waitForEnter() // ожидание любого ввода перед обнулением экрана
+{
+    cout << endl << "введите любое число для продолжения"; // system() не хочет фризить
+    string a { "1" };
+    cin >> a;
+    clearScr();
+}
+
+void writeScoreInFile(const TGame& g)    // записать счет в файл со счетом
+{
+    const size_t size {3};
+    int buf[size] = { 0 };
+    fstream fin(SCORES);   //открываем файл с очками для чтения
+
+    if (fin.is_open())
+    {
+        for (size_t i = 0; i < size; i++)
+        {
+            fin >> buf[i]; // читаем из файла в массив
+        }
+        fin.close();
+    }
+
+    if (g.progress == HUMAN_WINS)       //добавляем в зависимости от прогресса
+        buf[0] ++;
+    else if (g.progress == AI_WINS)
+        buf[1] ++;
+    else if (g.progress == IN_PROGRESS)
+        buf[2] ++;
+
+    ofstream fout(SCORES);   //открываем файл с очками для записи
+    
+    if (fout.is_open())
+    {
+        for (size_t i = 0; i < size; i++)
+        {
+            fout << buf[i] << " "; // записываем массив
+        }
+        fin.close();
+    }    
 }
 
 void congrats (const TGame& g) // проверяем выйграл ли кто-нибудь
@@ -144,9 +209,11 @@ void congrats (const TGame& g) // проверяем выйграл ли кто-
         cout << "Выйграл компьютер!";
     else if (g.progress == DRAW)
         cout << "Ничья :(";
+    writeScoreInFile(g);
+    waitForEnter();    
 }
 
-TProgress getWon (const TGame& g)
+TProgress getWon (const TGame& g)  //Выйграл ли кто-то
 {
     for (size_t y = 0; y < g.size; y++)     //проверяем вертикали
     {
@@ -246,7 +313,7 @@ TCoord getHumanCoord(const TGame& g) //ход человека
     TCoord c;
     do
     {
-        cout << "Введите воординаты y и x:";
+        cout << "Введите координаты X и Y:";
         cin >> c.x; 
         cin >> c.y;
 
@@ -258,9 +325,9 @@ TCoord getHumanCoord(const TGame& g) //ход человека
     return c;
 }
 
-TCoord getAICoord( TGame& g) //ход человека
+TCoord getAICoord( TGame& g)    //ход ИИ
 {
-    TCoord cnt; //центр поля
+    TCoord cnt; //центр поля (для четных ячеек сомнительно нужен рандом центра)
 
     cnt.x = g.size / 2;
     cnt.y = cnt.x;
@@ -363,7 +430,7 @@ void AITurn (TGame& g)     ///ход ИИ
     g.ppField[c.y][c.x] = g.aiFig;
 }
 
-void newGame()
+void newGame()          //тело игры
 {
     TGame g; 
     
@@ -392,8 +459,68 @@ void newGame()
     deinitGame(g);
 }
 
+void startScreen()  // отрисовывает стартовый экран
+{
+    cout << CCROSS  << "   ───╔═╗╔═╗───╔═══╗────" << endl
+                    << "   ───╚╗╚╝╔╝───║╔═╗║────" << endl
+                    << "   ────╚╗╔╝────║║─║║────" << endl
+                    << "   ────╔╝╚╗────║║─║║────" << endl
+                    << "   ───╔╝╔╗╚╗───║╚═╝║────" << endl
+                    << "   ───╚═╝╚═╝───╚═══╝────" << endl << endl;
+    cout << CEMPTY  << "введите 1 чтобы начать игру" << endl;;
+    cout << CEMPTY  << " введите 2 посмотреть счёт" << endl;;
+    cout << CEMPTY  << "   введите 3 чтобы выйти" << endl;;
+    cout << CRESET << endl;    
+}
+
+void showScore ()   //показать таблицу очков
+{
+    const size_t size {3};
+    const string str [size] = {"победы человека ----- ",
+                               "победы компьютера --- ",
+                               "ничьи --------------- "};
+    
+    clearScr();
+
+    cout << CCROSS <<          "======================" << endl //шапка
+                            << "-------- СЧЁТ --------" << endl
+                            << "======================" << endl << endl;
+
+    cout << CRESET;
+
+    ifstream fin(SCORES);   //открываем файл с очками
+    if (fin.is_open())
+    {
+        int buf[size];
+        for (size_t i = 0; i < size; i++)
+        {
+            fin >> buf[i];
+            cout << CEMPTY << str[i] << buf[i] << endl;; // печать таблицы счета
+        }
+        fin.close();
+    }
+    else
+    {
+        cout << CEMPTY << " компьютер и человек" << endl
+                       << "еще не сражались здесь!" << endl;
+    }    
+    cout << CRESET;
+    waitForEnter();
+}
+
 int main()
 {
-    newGame();
+    size_t menuChoice { 0U };
+    do
+    {
+        startScreen();
+        cin >> menuChoice;
+        if (menuChoice == 1)
+            newGame();
+        else if (menuChoice == 2)
+            showScore();
+    } while (menuChoice != 3);
+
+    cout << endl << endl;
     return 0;
 }
