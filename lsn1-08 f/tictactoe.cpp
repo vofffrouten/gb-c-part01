@@ -11,7 +11,6 @@ using namespace std;
 
 #define SCORES "scores" // имя файля со счетом
 
-//цвета консоли делаю через дефайн не дал сделать enum string (
 #ifdef __linux__
 #define CRESET "\e[0m" //сброс 
 #define CEMPTY "\e[0;32m" //зелень - пустые клетки
@@ -19,7 +18,7 @@ using namespace std;
 #define CCROSS "\e[1;34m" //синий жирный
 #define CTABLE "\e[0;30m" //номера ячеек
 #define CTABLEU "\e[4;30m" //номера ячеек underline
-#elif  _WIN64               
+#elif  (_WIN64 || _WIN32)               
 #define CRESET "\x1B[0m" //сброс 
 #define CEMPTY "\x1B[0;32m" //зелень - пустые клетки
 #define CZERO "\x1B[1;33m" //желтый жирный
@@ -27,6 +26,8 @@ using namespace std;
 #define CTABLE "\x1B[0;32m" //номера ячеек
 #define CTABLEU "\x1B[4;32m" //номера ячеек underline   
 #endif
+
+//=====================================
 
 void locate()
 {
@@ -196,7 +197,7 @@ void writeScoreInFile(const TGame& g)    // записать счет в фай�
         buf[0] ++;
     else if (g.progress == AI_WINS)
         buf[1] ++;
-    else if (g.progress == IN_PROGRESS)
+    else if (g.progress == DRAW)
         buf[2] ++;
 
     ofstream fout(SCORES);   //открываем файл с очками для записи
@@ -211,9 +212,8 @@ void writeScoreInFile(const TGame& g)    // записать счет в фай�
     }
 }
 
-void congrats(const TGame& g) // проверяем выйграл ли кто-нибудь
+void congrats(const TGame& g) // проверяем статус игры
 {
-    clearScr();
     cout << endl << endl << "=====================" << endl;
 
     if (g.progress == HUMAN_WINS)
